@@ -120,6 +120,7 @@ StartupDecodingContext(List *output_plugin_options,
 					   XLogRecPtr start_lsn,
 					   TransactionId xmin_horizon,
 					   bool need_full_snapshot,
+					   bool fast_forward,
 					   XLogPageReadCB read_page,
 					   LogicalOutputPluginWriterPrepareWrite prepare_write,
 					   LogicalOutputPluginWriterWrite do_write,
@@ -145,7 +146,8 @@ StartupDecodingContext(List *output_plugin_options,
 	 * (re-)load output plugins, so we detect a bad (removed) output plugin
 	 * now.
 	 */
-	LoadOutputPlugin(&ctx->callbacks, NameStr(slot->data.plugin));
+	if (!fast_forward)
+		LoadOutputPlugin(&ctx->callbacks, NameStr(slot->data.plugin));
 
 	/*
 	 * Now that the slot's xmin has been set, we can announce ourselves as a
@@ -195,6 +197,8 @@ StartupDecodingContext(List *output_plugin_options,
 	ctx->update_progress = update_progress;
 
 	ctx->output_plugin_options = output_plugin_options;
+
+	ctx->fast_forward = fast_forward;
 
 	MemoryContextSwitchTo(old_context);
 
@@ -308,8 +312,9 @@ CreateInitDecodingContext(char *plugin,
 	ReplicationSlotSave();
 
 	ctx = StartupDecodingContext(NIL, InvalidXLogRecPtr, xmin_horizon,
-								 need_full_snapshot, read_page, prepare_write,
-								 do_write, update_progress);
+								 need_full_snapshot, true,
+								 read_page, prepare_write, do_write,
+								 update_progress);
 
 	/* call output plugin initialization callback */
 	old_context = MemoryContextSwitchTo(ctx->context);
@@ -347,6 +352,7 @@ CreateInitDecodingContext(char *plugin,
 LogicalDecodingContext *
 CreateDecodingContext(XLogRecPtr start_lsn,
 					  List *output_plugin_options,
+					  bool fast_forward,
 					  XLogPageReadCB read_page,
 					  LogicalOutputPluginWriterPrepareWrite prepare_write,
 					  LogicalOutputPluginWriterWrite do_write,
@@ -400,8 +406,8 @@ CreateDecodingContext(XLogRecPtr start_lsn,
 
 	ctx = StartupDecodingContext(output_plugin_options,
 								 start_lsn, InvalidTransactionId, false,
-								 read_page, prepare_write, do_write,
-								 update_progress);
+								 fast_forward, read_page, prepare_write,
+								 do_write, update_progress);
 
 	/* call output plugin initialization callback */
 	old_context = MemoryContextSwitchTo(ctx->context);
@@ -578,6 +584,8 @@ startup_cb_wrapper(LogicalDecodingContext *ctx, OutputPluginOptions *opt, bool i
 	LogicalErrorCallbackState state;
 	ErrorContextCallback errcallback;
 
+	Assert(!ctx->fast_forward);
+
 	/* Push callback + info on the error context stack */
 	state.ctx = ctx;
 	state.callback_name = "startup";
@@ -602,6 +610,8 @@ shutdown_cb_wrapper(LogicalDecodingContext *ctx)
 {
 	LogicalErrorCallbackState state;
 	ErrorContextCallback errcallback;
+
+	Assert(!ctx->fast_forward);
 
 	/* Push callback + info on the error context stack */
 	state.ctx = ctx;
@@ -634,6 +644,8 @@ begin_cb_wrapper(ReorderBuffer *cache, ReorderBufferTXN *txn)
 	LogicalErrorCallbackState state;
 	ErrorContextCallback errcallback;
 
+	Assert(!ctx->fast_forward);
+
 	/* Push callback + info on the error context stack */
 	state.ctx = ctx;
 	state.callback_name = "begin";
@@ -663,6 +675,8 @@ commit_cb_wrapper(ReorderBuffer *cache, ReorderBufferTXN *txn,
 	LogicalErrorCallbackState state;
 	ErrorContextCallback errcallback;
 
+	Assert(!ctx->fast_forward);
+
 	/* Push callback + info on the error context stack */
 	state.ctx = ctx;
 	state.callback_name = "commit";
@@ -691,6 +705,8 @@ change_cb_wrapper(ReorderBuffer *cache, ReorderBufferTXN *txn,
 	LogicalDecodingContext *ctx = cache->private_data;
 	LogicalErrorCallbackState state;
 	ErrorContextCallback errcallback;
+
+	Assert(!ctx->fast_forward);
 
 	/* Push callback + info on the error context stack */
 	state.ctx = ctx;
@@ -726,6 +742,8 @@ filter_by_origin_cb_wrapper(LogicalDecodingContext *ctx, RepOriginId origin_id)
 	ErrorContextCallback errcallback;
 	bool		ret;
 
+	Assert(!ctx->fast_forward);
+
 	/* Push callback + info on the error context stack */
 	state.ctx = ctx;
 	state.callback_name = "filter_by_origin";
@@ -755,6 +773,8 @@ message_cb_wrapper(ReorderBuffer *cache, ReorderBufferTXN *txn,
 	LogicalDecodingContext *ctx = cache->private_data;
 	LogicalErrorCallbackState state;
 	ErrorContextCallback errcallback;
+
+	Assert(!ctx->fast_forward);
 
 	if (ctx->callbacks.message_cb == NULL)
 		return;
