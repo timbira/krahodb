@@ -1710,7 +1710,7 @@ ApplyWorkerMain(Datum main_arg)
 		snprintf(originname, sizeof(originname), "pg_%u", MySubscription->oid);
 		originid = replorigin_by_name(originname, true);
 		if (!OidIsValid(originid))
-			originid = replorigin_create(originname);
+			originid = replorigin_create(originname, InvalidRepOriginId);
 		replorigin_session_setup(originid);
 		replorigin_session_origin = originid;
 		origin_startpos = replorigin_session_get_progress(false);

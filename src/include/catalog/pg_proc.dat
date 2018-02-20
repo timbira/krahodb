@@ -10045,7 +10045,7 @@
 # replication/origin.h
 { oid => '6003', descr => 'create a replication origin',
   proname => 'pg_replication_origin_create', provolatile => 'v',
-  proparallel => 'u', prorettype => 'oid', proargtypes => 'text',
+  proparallel => 'u', prorettype => 'oid', proargtypes => 'text int2',
   prosrc => 'pg_replication_origin_create' },
 
 { oid => '6004', descr => 'drop replication origin identified by its name',
