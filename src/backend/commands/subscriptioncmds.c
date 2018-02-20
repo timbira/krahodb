@@ -405,7 +405,7 @@ CreateSubscription(CreateSubscriptionStmt *stmt, bool isTopLevel)
 	recordDependencyOnOwner(SubscriptionRelationId, subid, owner);
 
 	snprintf(originname, sizeof(originname), "pg_%u", subid);
-	replorigin_create(originname);
+	replorigin_create(originname, InvalidRepOriginId);
 
 	/*
 	 * Connect to remote side to execute requested commands and fetch table
