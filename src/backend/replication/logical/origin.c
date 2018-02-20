@@ -239,17 +239,31 @@ replorigin_by_name(char *roname, bool missing_ok)
  * Needs to be called in a transaction.
  */
 RepOriginId
-replorigin_create(char *roname)
+replorigin_create(char *roname, RepOriginId roident)
 {
-	Oid			roident;
 	HeapTuple	tuple = NULL;
 	Relation	rel;
 	Datum		roname_d;
 	SnapshotData SnapshotDirty;
 	SysScanDesc scan;
 	ScanKeyData key;
+	bool		find_unused_id = false;
 
 	roname_d = CStringGetTextDatum(roname);
+
+	if (roident == InvalidRepOriginId)
+	{
+		find_unused_id = true;
+		/* scan starts with 1 */
+		roident = InvalidOid + 1;
+	}
+	else
+	{
+		if (roident >= PG_UINT16_MAX)
+			ereport(ERROR,
+					(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
+					 errmsg("replication origin OID out of valid range (1..%u)", PG_UINT16_MAX)));
+	}
 
 	Assert(IsTransactionState());
 
@@ -272,7 +286,7 @@ replorigin_create(char *roname)
 
 	rel = heap_open(ReplicationOriginRelationId, ExclusiveLock);
 
-	for (roident = InvalidOid + 1; roident < PG_UINT16_MAX; roident++)
+	do
 	{
 		bool		nulls[Natts_pg_replication_origin];
 		Datum		values[Natts_pg_replication_origin];
@@ -310,7 +324,9 @@ replorigin_create(char *roname)
 			CommandCounterIncrement();
 			break;
 		}
-	}
+
+		roident++;
+	} while (find_unused_id && roident < PG_UINT16_MAX);
 
 	/* now release lock again,	*/
 	heap_close(rel, ExclusiveLock);
@@ -1217,11 +1233,13 @@ pg_replication_origin_create(PG_FUNCTION_ARGS)
 {
 	char	   *name;
 	RepOriginId roident;
+	RepOriginId	roassigned;
 
 	replorigin_check_prerequisites(false, false);
 
 	name = text_to_cstring((text *) DatumGetPointer(PG_GETARG_DATUM(0)));
-	roident = replorigin_create(name);
+	roassigned = PG_ARGISNULL(1) ? InvalidRepOriginId : PG_GETARG_UINT16(0);
+	roident = replorigin_create(name, roassigned);
 
 	pfree(name);
 
