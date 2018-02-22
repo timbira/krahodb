@@ -51,6 +51,7 @@
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
 #include "utils/syscache.h"
+#include "utils/varlena.h"
 
 static List *fetch_table_list(WalReceiverConn *wrconn, List *publications);
 
@@ -66,7 +67,7 @@ parse_subscription_options(List *options, bool *connect, bool *enabled_given,
 						   bool *enabled, bool *create_slot,
 						   bool *slot_name_given, char **slot_name,
 						   bool *copy_data, char **synchronous_commit,
-						   bool *refresh)
+						   bool *refresh, List **filtered_origins)
 {
 	ListCell   *lc;
 	bool		connect_given = false;
@@ -97,6 +98,10 @@ parse_subscription_options(List *options, bool *connect, bool *enabled_given,
 		*synchronous_commit = NULL;
 	if (refresh)
 		*refresh = true;
+	if (filtered_origins)
+		*filtered_origins = NIL;
+	if (roident)
+		*roident = InvalidOid;
 
 	/* Parse options */
 	foreach(lc, options)
@@ -182,6 +187,23 @@ parse_subscription_options(List *options, bool *connect, bool *enabled_given,
 			refresh_given = true;
 			*refresh = defGetBoolean(defel);
 		}
+		else if (strcmp(defel->defname, "filter_origins") == 0 && filtered_origins)
+		{
+			char	*tmpstr;
+
+			if (list_length(*filtered_origins) > 0)
+				ereport(ERROR,
+						(errcode(ERRCODE_SYNTAX_ERROR),
+						 errmsg("conflicting or redundant options")));
+
+			tmpstr = defGetString(defel);
+			/* parse string into list of origins */
+			if (!string_to_oid_list(tmpstr, ',', filtered_origins))
+				ereport(ERROR,
+						(errcode(ERRCODE_SYNTAX_ERROR),
+						 errmsg("invalid list syntax in parameter \"%s\"",
+								"filter_origins")));
+		}
 		else
 			ereport(ERROR,
 					(errcode(ERRCODE_SYNTAX_ERROR),
@@ -255,7 +277,62 @@ parse_subscription_options(List *options, bool *connect, bool *enabled_given,
 }
 
 /*
- * Auxiliary function to build a text array out of a list of String nodes.
+ * Auxiliary function to return a Oid array out of a list of Oids.
+ */
+static Datum
+originListToArray(List *originlist)
+{
+	ArrayType  *arr;
+	Datum	   *datums;
+	int			i = 0;
+	ListCell   *cell;
+	MemoryContext memcxt;
+	MemoryContext oldcxt;
+
+	/* Create memory context for temporary allocations. */
+	memcxt = AllocSetContextCreate(CurrentMemoryContext,
+								   "originListToArray to array",
+								   ALLOCSET_DEFAULT_SIZES);
+	oldcxt = MemoryContextSwitchTo(memcxt);
+
+	datums = palloc(sizeof(Datum) * list_length(originlist));
+	foreach(cell, originlist)
+	{
+		Oid			origin = lfirst_oid(cell);
+		int			j = 0;
+		ListCell   *pcell;
+
+		/* Check for duplicates. */
+		foreach(pcell, originlist)
+		{
+			Oid		porigin = lfirst_oid(pcell);
+
+			if (i == j)
+				break;
+
+			if (origin == porigin)
+				ereport(ERROR,
+						(errcode(ERRCODE_SYNTAX_ERROR),
+						 errmsg("origin \"%u\" used more than once",
+								origin)));
+
+			j++;
+		}
+
+		datums[i++] = ObjectIdGetDatum(origin);
+	}
+
+	MemoryContextSwitchTo(oldcxt);
+
+	arr = construct_array(datums, list_length(originlist),
+						  OIDOID, sizeof(Oid), true, 'i');
+	MemoryContextDelete(memcxt);
+
+	return PointerGetDatum(arr);
+}
+
+/*
+ * Auxiliary function to return a text array out of a list of String nodes.
  */
 static Datum
 publicationListToArray(List *publist)
@@ -332,6 +409,7 @@ CreateSubscription(CreateSubscriptionStmt *stmt, bool isTopLevel)
 	char		originname[NAMEDATALEN];
 	bool		create_slot;
 	List	   *publications;
+	List	   *filtered_origins;
 
 	/*
 	 * Parse and check options.
@@ -341,7 +419,7 @@ CreateSubscription(CreateSubscriptionStmt *stmt, bool isTopLevel)
 	parse_subscription_options(stmt->options, &connect, &enabled_given,
 							   &enabled, &create_slot, &slotname_given,
 							   &slotname, &copy_data, &synchronous_commit,
-							   NULL);
+							   NULL, &filtered_origins);
 
 	/*
 	 * Since creating a replication slot is not transactional, rolling back
@@ -418,6 +496,11 @@ CreateSubscription(CreateSubscriptionStmt *stmt, bool isTopLevel)
 		CStringGetTextDatum(synchronous_commit);
 	values[Anum_pg_subscription_subpublications - 1] =
 		publicationListToArray(publications);
+	if (list_length(filtered_origins) > 0)
+		values[Anum_pg_subscription_subfilterorigins - 1] =
+			originListToArray(filtered_origins);
+	else
+		nulls[Anum_pg_subscription_subfilterorigins - 1] = true;
 
 	tup = heap_form_tuple(RelationGetDescr(rel), values, nulls);
 
@@ -682,10 +765,16 @@ AlterSubscription(AlterSubscriptionStmt *stmt)
 				char	   *slotname;
 				bool		slotname_given;
 				char	   *synchronous_commit;
+				List	   *filtered_origins;
 
 				parse_subscription_options(stmt->options, NULL, NULL, NULL,
 										   NULL, &slotname_given, &slotname,
-										   NULL, &synchronous_commit, NULL);
+										   NULL, &synchronous_commit, NULL, &filtered_origins);
+
+				if (OidIsValid(roident))
+					ereport(ERROR,
+							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+							 errmsg("cannot set replication_origin_id for existing subscription")));
 
 				if (slotname_given)
 				{
@@ -710,6 +799,24 @@ AlterSubscription(AlterSubscriptionStmt *stmt)
 					replaces[Anum_pg_subscription_subsynccommit - 1] = true;
 				}
 
+				if (list_length(filtered_origins) > 0)
+				{
+					values[Anum_pg_subscription_subfilterorigins - 1] =
+						originListToArray(filtered_origins);
+					replaces[Anum_pg_subscription_subfilterorigins - 1] = true;
+				}
+				list_free(filtered_origins);
+
+				/*
+				 * If we allow to change replication_origin_id we should change
+				 * replication origin identifier too. However, it means that we
+				 * lost track of replication progress and also we could have
+				 * some problem with origin filtering (parameters
+				 * replication_origin_id and filter_origins must be changed
+				 * simultaneously to avoid conflicts).
+				 */
+				replaces[Anum_pg_subscription_subroident - 1] = false;
+
 				update_tuple = true;
 				break;
 			}
@@ -721,7 +828,7 @@ AlterSubscription(AlterSubscriptionStmt *stmt)
 
 				parse_subscription_options(stmt->options, NULL,
 										   &enabled_given, &enabled, NULL,
-										   NULL, NULL, NULL, NULL, NULL);
+										   NULL, NULL, NULL, NULL, NULL, NULL);
 				Assert(enabled_given);
 
 				if (!sub->slotname && enabled)
@@ -759,7 +866,7 @@ AlterSubscription(AlterSubscriptionStmt *stmt)
 
 				parse_subscription_options(stmt->options, NULL, NULL, NULL,
 										   NULL, NULL, NULL, &copy_data,
-										   NULL, &refresh);
+										   NULL, &refresh, NULL);
 
 				values[Anum_pg_subscription_subpublications - 1] =
 					publicationListToArray(stmt->publication);
@@ -796,7 +903,7 @@ AlterSubscription(AlterSubscriptionStmt *stmt)
 
 				parse_subscription_options(stmt->options, NULL, NULL, NULL,
 										   NULL, NULL, NULL, &copy_data,
-										   NULL, NULL);
+										   NULL, NULL, NULL);
 
 				AlterSubscription_refresh(sub, copy_data);
 
