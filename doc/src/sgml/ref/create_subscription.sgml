@@ -206,6 +206,28 @@ CREATE SUBSCRIPTION <replaceable class="PARAMETER">subscription_name</replaceabl
          </para>
         </listitem>
        </varlistentry>
+
+       <varlistentry>
+        <term><literal>replication_origin_id</literal> (<type>integer</type>)</term>
+        <listitem>
+         <para>
+          Specifies a replication origin identifier to use. The default is to automatically generate the replication origin identifier.
+         </para>
+
+         <para>
+          <literal>replication_origin_id</literal> in conjunction with <literal>filter_origins</literal> is useful to prevent loops in bi-directional replication setups. It is not allowed to change <literal>replication_origin_id</literal> because it would break replication.
+         </para>
+        </listitem>
+       </varlistentry>
+
+       <varlistentry>
+        <term><literal>filter_origins</literal> (<type>string</type>)</term>
+        <listitem>
+         <para>
+          Specifies a list of comma separated replication origin identifiers that will be filtered. The default is an empty list (that means all rows will be forwarded to subscriber).
+         </para>
+        </listitem>
+       </varlistentry>
       </variablelist>
      </para>
     </listitem>

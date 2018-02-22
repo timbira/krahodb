@@ -163,8 +163,8 @@ ALTER SUBSCRIPTION <replaceable class="PARAMETER">name</replaceable> RENAME TO <
      <para>
       This clause alters parameters originally set by
       <xref linkend="SQL-CREATESUBSCRIPTION">.  See there for more
-      information.  The allowed options are <literal>slot_name</literal> and
-      <literal>synchronous_commit</literal>
+      information.  The allowed options are <literal>slot_name</literal>,
+      <literal>synchronous_commit</literal> and <literal>filter_origins</literal>
      </para>
     </listitem>
    </varlistentry>
@@ -205,6 +205,13 @@ ALTER SUBSCRIPTION mysub SET PUBLICATION insert_only;
 <programlisting>
 ALTER SUBSCRIPTION mysub DISABLE;
 </programlisting></para>
+
+  <para>
+   Change the list of origins that a subscriber will filter:
+<programlisting>
+ALTER SUBSCRIPTION bdrep SET (filter_origins = '123, 456, 789, 6');
+</programlisting>
+  </para>
  </refsect1>
 
  <refsect1>

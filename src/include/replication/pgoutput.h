@@ -25,6 +25,8 @@ typedef struct PGOutputData
 
 	List	   *publication_names;
 	List	   *publications;
+
+	List	   *origin_ids;
 } PGOutputData;
 
 #endif							/* PGOUTPUT_H */
