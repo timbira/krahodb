@@ -40,6 +40,7 @@
 
 
 static List *textarray_to_stringlist(ArrayType *textarray);
+static List *oidarray_to_oidlist(ArrayType *oidarray);
 
 /*
  * Fetch the subscription from the syscache.
@@ -106,6 +107,16 @@ GetSubscription(Oid subid, bool missing_ok)
 	Assert(!isnull);
 	sub->publications = textarray_to_stringlist(DatumGetArrayTypeP(datum));
 
+	/* Get origins to filter out */
+	datum = SysCacheGetAttr(SUBSCRIPTIONOID,
+							tup,
+							Anum_pg_subscription_subfilterorigins,
+							&isnull);
+	if (!isnull)
+		sub->filterorigins = oidarray_to_oidlist(DatumGetArrayTypeP(datum));
+	else
+		sub->filterorigins = NULL;
+
 	ReleaseSysCache(tup);
 
 	return sub;
@@ -155,6 +166,7 @@ FreeSubscription(Subscription *sub)
 	if (sub->slotname)
 		pfree(sub->slotname);
 	list_free_deep(sub->publications);
+	list_free(sub->filterorigins);
 	pfree(sub);
 }
 
@@ -235,7 +247,40 @@ textarray_to_stringlist(ArrayType *textarray)
 }
 
 /*
- * Add new state record for a subscription table.
+ * Convert oid array to list of oids.
+ */
+static List *
+oidarray_to_oidlist(ArrayType *oidarray)
+{
+	Datum	   *elems;
+	int			nelems,
+				i;
+	List	   *res = NIL;
+
+	deconstruct_array(oidarray,
+					  OIDOID, sizeof(Oid), true, 'i',
+					  &elems, NULL, &nelems);
+
+	if (nelems == 0)
+		return NIL;
+
+	for (i = 0; i < nelems; i++)
+		res = lappend_oid(res, DatumGetObjectId(elems[i]));
+
+	return res;
+}
+
+/*
+ * Set the state of a subscription table.
+ *
+ * If update_only is true and the record for given table doesn't exist, do
+ * nothing.  This can be used to avoid inserting a new record that was deleted
+ * by someone else.  Generally, subscription DDL commands should use false,
+ * workers should use true.
+ *
+ * The insert-or-update logic in this function is not concurrency safe so it
+ * might raise an error in rare circumstances.  But if we took a stronger lock
+ * such as ShareRowExclusiveLock, we would risk more deadlocks.
  */
 void
 AddSubscriptionRelState(Oid subid, Oid relid, char state,

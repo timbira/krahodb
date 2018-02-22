@@ -99,11 +99,12 @@ _PG_output_plugin_init(OutputPluginCallbacks *cb)
 
 static void
 parse_output_parameters(List *options, uint32 *protocol_version,
-						List **publication_names)
+						List **publication_names, List **origin_ids)
 {
 	ListCell   *lc;
 	bool		protocol_version_given = false;
 	bool		publication_names_given = false;
+	bool		origin_ids_given = false;
 
 	foreach(lc, options)
 	{
@@ -149,6 +150,20 @@ parse_output_parameters(List *options, uint32 *protocol_version,
 						(errcode(ERRCODE_INVALID_NAME),
 						 errmsg("invalid publication_names syntax")));
 		}
+		else if (strcmp(defel->defname, "filter_origins") == 0)
+		{
+			if (origin_ids_given)
+				ereport(ERROR,
+						(errcode(ERRCODE_SYNTAX_ERROR),
+						 errmsg("conflicting or redundant options")));
+			origin_ids_given = true;
+
+			if (!string_to_oid_list(strVal(defel->arg), ',',
+									   origin_ids))
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_NAME),
+						 errmsg("invalid filter_origins syntax")));
+		}
 		else
 			elog(ERROR, "unrecognized pgoutput option: %s", defel->defname);
 	}
@@ -183,7 +198,8 @@ pgoutput_startup(LogicalDecodingContext *ctx, OutputPluginOptions *opt,
 		/* Parse the params and ERROR if we see any we don't recognize */
 		parse_output_parameters(ctx->output_plugin_options,
 								&data->protocol_version,
-								&data->publication_names);
+								&data->publication_names,
+								&data->origin_ids);
 
 		/* Check if we support requested protocol */
 		if (data->protocol_version > LOGICALREP_PROTO_VERSION_NUM)
@@ -551,12 +567,23 @@ pgoutput_truncate(LogicalDecodingContext *ctx, ReorderBufferTXN *txn,
 }
 
 /*
- * Currently we always forward.
+ * Determine whether changes will be filtered or forwarded.
  */
 static bool
 pgoutput_origin_filter(LogicalDecodingContext *ctx,
 					   RepOriginId origin_id)
 {
+	PGOutputData *data = (PGOutputData *) ctx->output_plugin_private;
+
+	/* changes produced locally are never filtered */
+	if (origin_id == InvalidRepOriginId)
+		return false;
+
+	/* changes are only filtered from those origin ids provided by the subscriber */
+	if (list_length(data->origin_ids) > 0 && list_member_oid(data->origin_ids, origin_id))
+		return true;
+
+	/* there isn't a list of origins to filter out then forward to all subscribers */
 	return false;
 }
 

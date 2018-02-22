@@ -3856,6 +3856,65 @@ SplitDirectoriesString(char *rawstring, char separator,
 	return true;
 }
 
+/*
+ * Convert a string into a list of Oids
+ */
+bool
+string_to_oid_list(char *str, char separator, List **result)
+{
+	char	*ptr = str;
+	bool	done = false;
+
+	*result = NIL;
+
+	/* skip leading whitespace */
+	while (scanner_isspace(*ptr))
+		ptr++;
+
+	if (*ptr == '\0')
+		return true;	/* empty string */
+
+	do
+	{
+		char	*curstr;
+		char	*endp;
+		Oid		originid;
+
+		curstr = ptr;
+		while (*ptr && *ptr != separator && !scanner_isspace(*ptr))
+			ptr++;
+		endp = ptr;
+
+		/* skip trailing whitespace */
+		while (scanner_isspace(*ptr))
+			ptr++;
+
+		if (*ptr == separator)
+		{
+			ptr++;
+			/* skip leading whitespace for next */
+			while (scanner_isspace(*ptr))
+				ptr++;
+		}
+		else if (*ptr == '\0')
+			done = true;
+		else
+			return false;	/* invalid syntax */
+
+		/* it is safe to overwrite separator with a null */
+		*endp = '\0';
+
+		originid = (Oid) atoi(curstr);
+
+		/* add it to list */
+		*result = lappend_oid(*result, originid);
+
+		/* get another element if we didn't reach end of string */
+	} while (!done);
+
+	return true;
+}
+
 
 /*
  * SplitGUCList --- parse a string containing identifiers or file names
