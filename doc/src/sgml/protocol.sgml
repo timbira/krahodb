@@ -2684,6 +2684,17 @@ The commands accepted in replication mode are:
       </para>
      </listitem>
     </varlistentry>
+
+    <varlistentry>
+     <term>
+      filter_origins
+     </term>
+     <listitem>
+      <para>
+       Comma separated list of replication origin identifiers.
+      </para>
+     </listitem>
+    </varlistentry>
    </variablelist>
 
   </para>
