@@ -39,6 +39,7 @@
 
 
 static List *textarray_to_stringlist(ArrayType *textarray);
+static List *oidarray_to_oidlist(ArrayType *oidarray);
 
 /*
  * Fetch the subscription from the syscache.
@@ -105,6 +106,16 @@ GetSubscription(Oid subid, bool missing_ok)
 	Assert(!isnull);
 	sub->publications = textarray_to_stringlist(DatumGetArrayTypeP(datum));
 
+	/* Get origins to filter out */
+	datum = SysCacheGetAttr(SUBSCRIPTIONOID,
+							tup,
+							Anum_pg_subscription_subfilterorigins,
+							&isnull);
+	if (!isnull)
+		sub->filterorigins = oidarray_to_oidlist(DatumGetArrayTypeP(datum));
+	else
+		sub->filterorigins = NULL;
+
 	ReleaseSysCache(tup);
 
 	return sub;
@@ -154,6 +165,7 @@ FreeSubscription(Subscription *sub)
 	if (sub->slotname)
 		pfree(sub->slotname);
 	list_free_deep(sub->publications);
+	list_free(sub->filterorigins);
 	pfree(sub);
 }
 
@@ -222,6 +234,30 @@ textarray_to_stringlist(ArrayType *textarray)
 
 	for (i = 0; i < nelems; i++)
 		res = lappend(res, makeString(TextDatumGetCString(elems[i])));
+
+	return res;
+}
+
+/*
+ * Convert oid array to list of oids.
+ */
+static List *
+oidarray_to_oidlist(ArrayType *oidarray)
+{
+	Datum	   *elems;
+	int			nelems,
+				i;
+	List	   *res = NIL;
+
+	deconstruct_array(oidarray,
+					  OIDOID, sizeof(Oid), true, 'i',
+					  &elems, NULL, &nelems);
+
+	if (nelems == 0)
+		return NIL;
+
+	for (i = 0; i < nelems; i++)
+		res = lappend_oid(res, DatumGetObjectId(elems[i]));
 
 	return res;
 }

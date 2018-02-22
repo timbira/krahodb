@@ -52,6 +52,9 @@ CATALOG(pg_subscription,6100) BKI_SHARED_RELATION BKI_ROWTYPE_OID(6101) BKI_SCHE
 
 	/* List of publications subscribed to */
 	text		subpublications[1] BKI_FORCE_NOT_NULL;
+
+	/* List of origins to filter out */
+	text		subfilterorigins[1];
 #endif
 } FormData_pg_subscription;
 
@@ -61,7 +64,7 @@ typedef FormData_pg_subscription *Form_pg_subscription;
  *		compiler constants for pg_subscription
  * ----------------
  */
-#define Natts_pg_subscription					8
+#define Natts_pg_subscription					9
 #define Anum_pg_subscription_subdbid			1
 #define Anum_pg_subscription_subname			2
 #define Anum_pg_subscription_subowner			3
@@ -70,6 +73,7 @@ typedef FormData_pg_subscription *Form_pg_subscription;
 #define Anum_pg_subscription_subslotname		6
 #define Anum_pg_subscription_subsynccommit		7
 #define Anum_pg_subscription_subpublications	8
+#define Anum_pg_subscription_subfilterorigins	9
 
 
 typedef struct Subscription
@@ -84,6 +88,7 @@ typedef struct Subscription
 	char	   *slotname;		/* Name of the replication slot */
 	char	   *synccommit;		/* Synchronous commit setting for worker */
 	List	   *publications;	/* List of publication names to subscribe to */
+	List	   *filterorigins;	/* List of origins to filter out */
 } Subscription;
 
 extern Subscription *GetSubscription(Oid subid, bool missing_ok);
