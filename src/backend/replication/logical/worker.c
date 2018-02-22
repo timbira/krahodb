@@ -104,6 +104,8 @@ bool		MySubscriptionValid = false;
 
 bool		in_remote_transaction = false;
 static XLogRecPtr remote_final_lsn = InvalidXLogRecPtr;
+static XLogRecPtr remote_origin_lsn = InvalidXLogRecPtr;
+static RepOriginId remote_origin_id = InvalidRepOriginId;
 
 static void send_feedback(XLogRecPtr recvpos, bool force, bool requestReply);
 
@@ -442,6 +444,7 @@ apply_handle_begin(StringInfo s)
 	logicalrep_read_begin(s, &begin_data);
 
 	remote_final_lsn = begin_data.final_lsn;
+	remote_origin_id = InvalidRepOriginId;
 
 	in_remote_transaction = true;
 
@@ -500,6 +503,8 @@ apply_handle_commit(StringInfo s)
 static void
 apply_handle_origin(StringInfo s)
 {
+	char	*origin;
+
 	/*
 	 * ORIGIN message can only come inside remote transaction and before any
 	 * actual writes.
@@ -509,6 +514,11 @@ apply_handle_origin(StringInfo s)
 		ereport(ERROR,
 				(errcode(ERRCODE_PROTOCOL_VIOLATION),
 				 errmsg("ORIGIN message sent out of order")));
+
+	ensure_transaction();
+
+	origin = logicalrep_read_origin(s, &remote_origin_lsn);
+	remote_origin_id = replorigin_by_name(origin, true);	/* XXX useful? */
 }
 
 /*
@@ -1726,6 +1736,7 @@ ApplyWorkerMain(Datum main_arg)
 	options.slotname = myslotname;
 	options.proto.logical.proto_version = LOGICALREP_PROTO_VERSION_NUM;
 	options.proto.logical.publication_names = MySubscription->publications;
+	options.proto.logical.origin_ids = MySubscription->filterorigins;
 
 	/* Start normal logical streaming replication. */
 	walrcv_startstreaming(wrconn, &options);
