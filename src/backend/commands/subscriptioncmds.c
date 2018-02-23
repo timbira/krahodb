@@ -66,13 +66,14 @@ parse_subscription_options(List *options, bool *connect, bool *enabled_given,
 						   bool *enabled, bool *create_slot,
 						   bool *slot_name_given, char **slot_name,
 						   bool *copy_data, char **synchronous_commit,
-						   bool *refresh, List **filtered_origins)
+						   bool *refresh, List **filtered_origins, Oid *roident)
 {
 	ListCell   *lc;
 	bool		connect_given = false;
 	bool		create_slot_given = false;
 	bool		copy_data_given = false;
 	bool		refresh_given = false;
+	bool		roident_given = false;
 
 	/* If connect is specified, the others also need to be. */
 	Assert(!connect || (enabled && create_slot && copy_data));
@@ -202,6 +203,23 @@ parse_subscription_options(List *options, bool *connect, bool *enabled_given,
 						(errcode(ERRCODE_SYNTAX_ERROR),
 						 errmsg("invalid list syntax in parameter \"%s\"",
 								"filter_origins")));
+		}
+		else if (strcmp(defel->defname, "replication_origin_id") == 0 && roident)
+		{
+			int	tmp;
+
+			if (roident_given)
+				ereport(ERROR,
+						(errcode(ERRCODE_SYNTAX_ERROR),
+						 errmsg("conflicting or redundant options")));
+
+			roident_given = true;
+			tmp = defGetInt32(defel);
+			if (tmp <= InvalidRepOriginId || tmp >= PG_UINT16_MAX)
+				ereport(ERROR,
+						(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
+						 errmsg("replication origin OID out of valid range (1..%u)", PG_UINT16_MAX)));
+			*roident = (Oid) tmp;
 		}
 		else
 			ereport(ERROR,
@@ -399,6 +417,7 @@ CreateSubscription(CreateSubscriptionStmt *stmt, bool isTopLevel)
 	bool		create_slot;
 	List	   *publications;
 	List	   *filtered_origins;
+	Oid			roident;
 
 	/*
 	 * Parse and check options.
@@ -408,7 +427,7 @@ CreateSubscription(CreateSubscriptionStmt *stmt, bool isTopLevel)
 	parse_subscription_options(stmt->options, &connect, &enabled_given,
 							   &enabled, &create_slot, &slotname_given,
 							   &slotname, &copy_data, &synchronous_commit,
-							   NULL, &filtered_origins);
+							   NULL, &filtered_origins, &roident);
 
 	/*
 	 * Since creating a replication slot is not transactional, rolling back
@@ -478,6 +497,7 @@ CreateSubscription(CreateSubscriptionStmt *stmt, bool isTopLevel)
 			originListToArray(filtered_origins);
 	else
 		nulls[Anum_pg_subscription_subfilterorigins - 1] = true;
+	values[Anum_pg_subscription_subroident - 1] = ObjectIdGetDatum(roident);
 
 	tup = heap_form_tuple(RelationGetDescr(rel), values, nulls);
 
@@ -488,7 +508,10 @@ CreateSubscription(CreateSubscriptionStmt *stmt, bool isTopLevel)
 	recordDependencyOnOwner(SubscriptionRelationId, subid, owner);
 
 	snprintf(originname, sizeof(originname), "pg_%u", subid);
-	replorigin_create(originname, InvalidRepOriginId);
+	if (OidIsValid(roident))
+		replorigin_create(originname, roident);
+	else
+		replorigin_create(originname, InvalidRepOriginId);
 
 	/*
 	 * Connect to remote side to execute requested commands and fetch table
@@ -740,10 +763,11 @@ AlterSubscription(AlterSubscriptionStmt *stmt)
 				bool		slotname_given;
 				char	   *synchronous_commit;
 				List	   *filtered_origins;
+				Oid			roident;
 
 				parse_subscription_options(stmt->options, NULL, NULL, NULL,
 										   NULL, &slotname_given, &slotname,
-										   NULL, &synchronous_commit, NULL, &filtered_origins);
+										   NULL, &synchronous_commit, NULL, &filtered_origins, &roident);
 
 				if (OidIsValid(roident))
 					ereport(ERROR,
@@ -801,7 +825,7 @@ AlterSubscription(AlterSubscriptionStmt *stmt)
 
 				parse_subscription_options(stmt->options, NULL,
 										   &enabled_given, &enabled, NULL,
-										   NULL, NULL, NULL, NULL, NULL, NULL);
+										   NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 				Assert(enabled_given);
 
 				if (!sub->slotname && enabled)
@@ -839,7 +863,7 @@ AlterSubscription(AlterSubscriptionStmt *stmt)
 
 				parse_subscription_options(stmt->options, NULL, NULL, NULL,
 										   NULL, NULL, NULL, &copy_data,
-										   NULL, &refresh, NULL);
+										   NULL, &refresh, NULL, NULL);
 
 				values[Anum_pg_subscription_subpublications - 1] =
 					publicationListToArray(stmt->publication);
@@ -876,7 +900,7 @@ AlterSubscription(AlterSubscriptionStmt *stmt)
 
 				parse_subscription_options(stmt->options, NULL, NULL, NULL,
 										   NULL, NULL, NULL, &copy_data,
-										   NULL, NULL, NULL);
+										   NULL, NULL, NULL, NULL);
 
 				AlterSubscription_refresh(sub, copy_data);
 
