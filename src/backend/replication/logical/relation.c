@@ -140,6 +140,16 @@ logicalrep_relmap_free_entry(LogicalRepRelMapEntry *entry)
 	}
 	bms_free(remoterel->attkeys);
 
+	if (remoterel->nrowfilters > 0)
+	{
+		int		i;
+
+		for (i = 0; i < remoterel->nrowfilters; i++)
+			pfree(remoterel->rowfiltercond[i]);
+
+		pfree(remoterel->rowfiltercond);
+	}
+
 	if (entry->attrmap)
 		pfree(entry->attrmap);
 }
@@ -187,6 +197,9 @@ logicalrep_relmap_update(LogicalRepRelation *remoterel)
 	}
 	entry->remoterel.replident = remoterel->replident;
 	entry->remoterel.attkeys = bms_copy(remoterel->attkeys);
+	entry->remoterel.rowfiltercond = palloc(remoterel->nrowfilters * sizeof(char *));
+	for (i = 0; i < remoterel->nrowfilters; i++)
+		entry->remoterel.rowfiltercond[i] = pstrdup(remoterel->rowfiltercond[i]);
 	MemoryContextSwitchTo(oldctx);
 }
 
