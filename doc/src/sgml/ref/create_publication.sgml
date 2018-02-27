@@ -22,7 +22,7 @@ PostgreSQL documentation
  <refsynopsisdiv>
 <synopsis>
 CREATE PUBLICATION <replaceable class="parameter">name</replaceable>
-    [ FOR TABLE [ ONLY ] <replaceable class="parameter">table_name</replaceable> [ * ] [, ...]
+    [ FOR TABLE [ ONLY ] <replaceable class="parameter">table_name</replaceable> [ * ] [ WHERE <replaceable class="parameter">condition</replaceable> ] [, ...]
       | FOR ALL TABLES ]
     [ WITH ( <replaceable class="parameter">publication_parameter</replaceable> [= <replaceable class="parameter">value</replaceable>] [, ... ] ) ]
 
@@ -68,7 +68,10 @@ CREATE PUBLICATION <replaceable class="parameter">name</replaceable>
       that table is added to the publication.  If <literal>ONLY</> is not
       specified, the table and all its descendant tables (if any) are added.
       Optionally, <literal>*</> can be specified after the table name to
-      explicitly indicate that descendant tables are included.
+      explicitly indicate that descendant tables are included. If the optional
+      <literal>WHERE</literal> clause is specified, rows that do not satisfy
+      the <replaceable class="parameter">condition</replaceable> will not be
+      published.
      </para>
 
      <para>
@@ -180,6 +183,13 @@ CREATE PUBLICATION <replaceable class="parameter">name</replaceable>
    Create a publication that publishes all changes in two tables:
 <programlisting>
 CREATE PUBLICATION mypublication FOR TABLE users, departments;
+</programlisting>
+  </para>
+
+  <para>
+   Create a publication that publishes all changes from active departments:
+<programlisting>
+CREATE PUBLICATION active_departments FOR TABLE departments WHERE (active IS TRUE);
 </programlisting>
   </para>
 

@@ -29,8 +29,12 @@
 
 CATALOG(pg_publication_rel,6106)
 {
-	Oid			prpubid;		/* Oid of the publication */
-	Oid			prrelid;		/* Oid of the relation */
+	Oid				prpubid;		/* Oid of the publication */
+	Oid				prrelid;		/* Oid of the relation */
+
+#ifdef	CATALOG_VARLEN				/* variable-length fields start here */
+	pg_node_tree	prrowfilter;	/* nodeToString representation of row filter */
+#endif
 } FormData_pg_publication_rel;
 
 /* ----------------
@@ -45,8 +49,9 @@ typedef FormData_pg_publication_rel *Form_pg_publication_rel;
  * ----------------
  */
 
-#define Natts_pg_publication_rel				2
+#define Natts_pg_publication_rel				3
 #define Anum_pg_publication_rel_prpubid			1
 #define Anum_pg_publication_rel_prrelid			2
+#define	Anum_pg_publication_rel_prrowfilter		3
 
 #endif							/* PG_PUBLICATION_REL_H */
