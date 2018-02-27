@@ -1849,6 +1849,9 @@ transformSubLink(ParseState *pstate, SubLink *sublink)
 		case EXPR_KIND_CALL_ARGUMENT:
 			err = _("cannot use subquery in CALL argument");
 			break;
+		case EXPR_KIND_PUBLICATION_WHERE:
+			err = _("cannot use subquery in publication WHERE condition");
+			break;
 
 			/*
 			 * There is intentionally no default: case here, so that the
@@ -3475,6 +3478,8 @@ ParseExprKindName(ParseExprKind exprKind)
 			return "PARTITION BY";
 		case EXPR_KIND_CALL_ARGUMENT:
 			return "CALL";
+		case EXPR_KIND_PUBLICATION_WHERE:
+			return "publication WHERE";
 
 			/*
 			 * There is intentionally no default: case here, so that the

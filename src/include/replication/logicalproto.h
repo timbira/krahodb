@@ -50,6 +50,8 @@ typedef struct LogicalRepRelation
 	Oid		   *atttyps;		/* column types */
 	char		replident;		/* replica identity */
 	Bitmapset  *attkeys;		/* Bitmap of key columns */
+	char	  **rowfiltercond;	/* condition for row filtering */
+	int			nrowfilters;	/* number of row filters */
 } LogicalRepRelation;
 
 /* Type mapping info */
