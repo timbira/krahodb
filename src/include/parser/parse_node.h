@@ -73,6 +73,7 @@ typedef enum ParseExprKind
 	EXPR_KIND_CALL_ARGUMENT,	/* procedure argument in CALL */
 	EXPR_KIND_COPY_WHERE,		/* WHERE condition in COPY FROM */
 	EXPR_KIND_GENERATED_COLUMN, /* generation expression for a column */
+	EXPR_KIND_PUBLICATION_WHERE,	/* WHERE condition for a table in PUBLICATION */
 } ParseExprKind;
 
 

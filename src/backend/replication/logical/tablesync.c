@@ -648,8 +648,14 @@ fetch_remote_table_info(char *nspname, char *relname,
 	TupleTableSlot *slot;
 	Oid			tableRow[2] = {OIDOID, CHAROID};
 	Oid			attrRow[3] = {TEXTOID, OIDOID, BOOLOID};
+	Oid			rowfilterRow[1] = {TEXTOID};
 	bool		isnull;
-	int			natt;
+	int			n;
+	ListCell   *lc;
+	bool		first;
+
+	/* Avoid trashing relation map cache */
+	memset(lrel, 0, sizeof(LogicalRepRelation));
 
 	lrel->nspname = nspname;
 	lrel->relname = relname;
@@ -713,20 +719,20 @@ fetch_remote_table_info(char *nspname, char *relname,
 	lrel->atttyps = palloc0(res->ntuples * sizeof(Oid));
 	lrel->attkeys = NULL;
 
-	natt = 0;
+	n = 0;
 	slot = MakeSingleTupleTableSlot(res->tupledesc, &TTSOpsMinimalTuple);
 	while (tuplestore_gettupleslot(res->tuplestore, true, false, slot))
 	{
-		lrel->attnames[natt] =
+		lrel->attnames[n] =
 			TextDatumGetCString(slot_getattr(slot, 1, &isnull));
 		Assert(!isnull);
-		lrel->atttyps[natt] = DatumGetObjectId(slot_getattr(slot, 2, &isnull));
+		lrel->atttyps[n] = DatumGetObjectId(slot_getattr(slot, 2, &isnull));
 		Assert(!isnull);
 		if (DatumGetBool(slot_getattr(slot, 3, &isnull)))
-			lrel->attkeys = bms_add_member(lrel->attkeys, natt);
+			lrel->attkeys = bms_add_member(lrel->attkeys, n);
 
 		/* Should never happen. */
-		if (++natt >= MaxTupleAttributeNumber)
+		if (++n >= MaxTupleAttributeNumber)
 			elog(ERROR, "too many columns in remote table \"%s.%s\"",
 				 nspname, relname);
 
@@ -734,7 +740,54 @@ fetch_remote_table_info(char *nspname, char *relname,
 	}
 	ExecDropSingleTupleTableSlot(slot);
 
-	lrel->natts = natt;
+	lrel->natts = n;
+
+	walrcv_clear_result(res);
+
+	/* Fetch row filtering info */
+	resetStringInfo(&cmd);
+	appendStringInfo(&cmd, "SELECT pg_get_expr(prrowfilter, prrelid) FROM pg_publication p INNER JOIN pg_publication_rel pr ON (p.oid = pr.prpubid) WHERE pr.prrelid = %u AND p.pubname IN (", MyLogicalRepWorker->relid);
+
+	first = true;
+	foreach(lc, MySubscription->publications)
+	{
+		char	*pubname = strVal(lfirst(lc));
+
+		if (first)
+			first = false;
+		else
+			appendStringInfoString(&cmd, ", ");
+
+		appendStringInfoString(&cmd, quote_literal_cstr(pubname));
+	}
+	appendStringInfoChar(&cmd, ')');
+
+	res = walrcv_exec(wrconn, cmd.data, 1, rowfilterRow);
+
+	if (res->status != WALRCV_OK_TUPLES)
+		ereport(ERROR,
+				(errmsg("could not fetch row filter info for table \"%s.%s\" from publisher: %s",
+						nspname, relname, res->err)));
+
+	lrel->rowfiltercond = palloc0(res->ntuples * sizeof(char *));
+
+	n = 0;
+	slot = MakeSingleTupleTableSlot(res->tupledesc);
+	while (tuplestore_gettupleslot(res->tuplestore, true, false, slot))
+	{
+		Datum rf = slot_getattr(slot, 1, &isnull);
+
+		if (!isnull)
+		{
+			char *p = TextDatumGetCString(rf);
+			lrel->rowfiltercond[n++] = p;
+		}
+
+		ExecClearTuple(slot);
+	}
+	ExecDropSingleTupleTableSlot(slot);
+
+	lrel->nrowfilters = n;
 
 	walrcv_clear_result(res);
 	pfree(cmd.data);
@@ -767,10 +820,57 @@ copy_table(Relation rel)
 	relmapentry = logicalrep_rel_open(lrel.remoteid, NoLock);
 	Assert(rel == relmapentry->localrel);
 
+	/* list of columns for COPY */
+	attnamelist = make_copy_attnamelist(relmapentry);
+
 	/* Start copy on the publisher. */
 	initStringInfo(&cmd);
-	appendStringInfo(&cmd, "COPY %s TO STDOUT",
-					 quote_qualified_identifier(lrel.nspname, lrel.relname));
+	/*
+	 * If publication has any row filter, build a SELECT query with OR'ed row
+	 * filters for COPY.
+	 * If no row filters are available, use COPY for all
+	 * table contents.
+	 */
+	if (lrel.nrowfilters > 0)
+	{
+		ListCell   *lc;
+		bool		first;
+		int			i;
+
+		appendStringInfoString(&cmd, "COPY (SELECT ");
+		/* list of attribute names */
+		first = true;
+		foreach(lc, attnamelist)
+		{
+			char	*col = strVal(lfirst(lc));
+
+			if (first)
+				first = false;
+			else
+				appendStringInfoString(&cmd, ", ");
+			appendStringInfo(&cmd, "%s", quote_identifier(col));
+		}
+		appendStringInfo(&cmd, " FROM %s",
+						 quote_qualified_identifier(lrel.nspname, lrel.relname));
+		appendStringInfoString(&cmd, " WHERE ");
+		/* list of OR'ed filters */
+		first = true;
+		for (i = 0; i < lrel.nrowfilters; i++)
+		{
+			if (first)
+				first = false;
+			else
+				appendStringInfoString(&cmd, " OR ");
+			appendStringInfo(&cmd, "%s", lrel.rowfiltercond[i]);
+		}
+
+		appendStringInfoString(&cmd, ") TO STDOUT");
+	}
+	else
+	{
+		appendStringInfo(&cmd, "COPY %s TO STDOUT",
+						 quote_qualified_identifier(lrel.nspname, lrel.relname));
+	}
 	res = walrcv_exec(wrconn, cmd.data, 0, NULL);
 	pfree(cmd.data);
 	if (res->status != WALRCV_OK_COPY_OUT)
@@ -785,7 +885,6 @@ copy_table(Relation rel)
 	addRangeTableEntryForRelation(pstate, rel, AccessShareLock,
 								  NULL, false, false);
 
-	attnamelist = make_copy_attnamelist(relmapentry);
 	cstate = BeginCopyFrom(pstate, rel, NULL, false, copy_read_data, attnamelist, NIL);
 
 	/* Do the copy */
