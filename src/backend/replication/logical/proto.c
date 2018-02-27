@@ -378,7 +378,7 @@ logicalrep_write_rel(StringInfo out, Relation rel)
 LogicalRepRelation *
 logicalrep_read_rel(StringInfo in)
 {
-	LogicalRepRelation *rel = palloc(sizeof(LogicalRepRelation));
+	LogicalRepRelation *rel = palloc0(sizeof(LogicalRepRelation));
 
 	rel->remoteid = pq_getmsgint(in, 4);
 
