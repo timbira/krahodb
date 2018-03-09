@@ -878,6 +878,7 @@ libpqrcv_processTuples(PGresult *pgres, WalRcvExecResult *walres,
 				 errdetail("Expected %d fields, got %d fields.",
 						   nRetTypes, nfields)));
 
+	walres->ntuples = PQntuples(pgres);
 	walres->tuplestore = tuplestore_begin_heap(true, false, work_mem);
 
 	/* Create tuple descriptor corresponding to expected result. */
@@ -888,7 +889,7 @@ libpqrcv_processTuples(PGresult *pgres, WalRcvExecResult *walres,
 	attinmeta = TupleDescGetAttInMetadata(walres->tupledesc);
 
 	/* No point in doing more here if there were no tuples returned. */
-	if (PQntuples(pgres) == 0)
+	if (walres->ntuples == 0)
 		return;
 
 	/* Create temporary context for local allocations. */
@@ -897,9 +898,9 @@ libpqrcv_processTuples(PGresult *pgres, WalRcvExecResult *walres,
 									   ALLOCSET_DEFAULT_SIZES);
 
 	/* Process returned rows. */
-	for (tupn = 0; tupn < PQntuples(pgres); tupn++)
+	for (tupn = 0; tupn < walres->ntuples; tupn++)
 	{
-		char	   *cstrs[MaxTupleAttributeNumber];
+		char	   *cstrs[nfields];
 
 		ProcessWalRcvInterrupts();
 
