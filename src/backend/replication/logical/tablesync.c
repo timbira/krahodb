@@ -660,7 +660,7 @@ fetch_remote_table_info(char *nspname, char *relname,
 	StringInfoData cmd;
 	TupleTableSlot *slot;
 	Oid			tableRow[2] = {OIDOID, CHAROID};
-	Oid			attrRow[4] = {TEXTOID, OIDOID, INT4OID, BOOLOID};
+	Oid			attrRow[3] = {TEXTOID, OIDOID, BOOLOID};
 	bool		isnull;
 	int			natt;
 
@@ -704,7 +704,6 @@ fetch_remote_table_info(char *nspname, char *relname,
 	appendStringInfo(&cmd,
 					 "SELECT a.attname,"
 					 "       a.atttypid,"
-					 "       a.atttypmod,"
 					 "       a.attnum = ANY(i.indkey)"
 					 "  FROM pg_catalog.pg_attribute a"
 					 "  LEFT JOIN pg_catalog.pg_index i"
@@ -714,7 +713,7 @@ fetch_remote_table_info(char *nspname, char *relname,
 					 "   AND a.attrelid = %u"
 					 " ORDER BY a.attnum",
 					 lrel->remoteid, lrel->remoteid);
-	res = walrcv_exec(wrconn, cmd.data, 4, attrRow);
+	res = walrcv_exec(wrconn, cmd.data, 3, attrRow);
 
 	if (res->status != WALRCV_OK_TUPLES)
 		ereport(ERROR,
@@ -735,7 +734,7 @@ fetch_remote_table_info(char *nspname, char *relname,
 		Assert(!isnull);
 		lrel->atttyps[natt] = DatumGetObjectId(slot_getattr(slot, 2, &isnull));
 		Assert(!isnull);
-		if (DatumGetBool(slot_getattr(slot, 4, &isnull)))
+		if (DatumGetBool(slot_getattr(slot, 3, &isnull)))
 			lrel->attkeys = bms_add_member(lrel->attkeys, natt);
 
 		/* Should never happen. */
