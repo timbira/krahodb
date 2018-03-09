@@ -197,6 +197,7 @@ typedef struct WalRcvExecResult
 	char	   *err;
 	Tuplestorestate *tuplestore;
 	TupleDesc	tupledesc;
+	int			ntuples;
 } WalRcvExecResult;
 
 /* libpqwalreceiver hooks */
