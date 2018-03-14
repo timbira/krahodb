@@ -333,6 +333,7 @@ AlterPublicationTables(AlterPublicationStmt *stmt, Relation rel,
 	List	   *rels = NIL;
 	Form_pg_publication pubform = (Form_pg_publication) GETSTRUCT(tup);
 	Oid			pubid = pubform->oid;
+	ListCell	*xpto;
 
 	/* Check that user is allowed to manipulate the publication tables. */
 	if (pubform->puballtables)
@@ -343,6 +344,16 @@ AlterPublicationTables(AlterPublicationStmt *stmt, Relation rel,
 				 errdetail("Tables cannot be added to or dropped from FOR ALL TABLES publications.")));
 
 	Assert(list_length(stmt->tables) > 0);
+
+	foreach(xpto, stmt->tables)
+	{
+		PublicationTable *t = lfirst(xpto);
+
+		if (t->whereClause == NULL)
+			elog(DEBUG3, "publication \"%s\" has no WHERE clause", NameStr(pubform->pubname));
+		else
+			elog(DEBUG3, "publication \"%s\" has WHERE clause", NameStr(pubform->pubname));
+	}
 
 	/*
 	 * ALTER PUBLICATION ... DROP TABLE cannot contain a WHERE clause.  Use
