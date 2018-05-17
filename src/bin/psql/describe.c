@@ -5445,7 +5445,8 @@ describePublications(const char *pattern)
 		if (!puballtables)
 		{
 			printfPQExpBuffer(&buf,
-							  "SELECT n.nspname, c.relname\n"
+							  "SELECT n.nspname, c.relname,\n"
+							  "  pg_get_expr(pr.prrowfilter, c.oid)\n"
 							  "FROM pg_catalog.pg_class c,\n"
 							  "     pg_catalog.pg_namespace n,\n"
 							  "     pg_catalog.pg_publication_rel pr\n"
@@ -5474,6 +5475,10 @@ describePublications(const char *pattern)
 				printfPQExpBuffer(&buf, "    \"%s.%s\"",
 								  PQgetvalue(tabres, j, 0),
 								  PQgetvalue(tabres, j, 1));
+
+				if (!PQgetisnull(tabres, j, 2))
+					appendPQExpBuffer(&buf, "  WHERE %s",
+									PQgetvalue(tabres, j, 2));
 
 				printTableAddFooter(&cont, buf.data);
 			}
