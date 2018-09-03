@@ -575,13 +575,20 @@ pgoutput_origin_filter(LogicalDecodingContext *ctx,
 {
 	PGOutputData *data = (PGOutputData *) ctx->output_plugin_private;
 
+	elog(DEBUG1, "origin: %u", origin_id);
+
 	/* changes produced locally are never filtered */
 	if (origin_id == InvalidRepOriginId)
 		return false;
 
+	elog(DEBUG3, "filter_origins list length: %d", list_length(data->origin_ids));
+
 	/* changes are only filtered from those origin ids provided by the subscriber */
 	if (list_length(data->origin_ids) > 0 && list_member_oid(data->origin_ids, origin_id))
+	{
+		elog(DEBUG2, "origin filter %u was matched", origin_id);
 		return true;
+	}
 
 	/* there isn't a list of origins to filter out then forward to all subscribers */
 	return false;
