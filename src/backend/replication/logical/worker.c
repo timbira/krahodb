@@ -463,6 +463,8 @@ apply_handle_begin(StringInfo s)
 	remote_final_lsn = begin_data.final_lsn;
 	remote_origin_id = InvalidRepOriginId;
 
+	elog(DEBUG1, "BEGIN: remote origin: %u ; session origin: %u", remote_origin_id, replorigin_session_origin);
+
 	in_remote_transaction = true;
 
 	pgstat_report_activity(STATE_RUNNING, NULL);
@@ -504,6 +506,8 @@ apply_handle_commit(StringInfo s)
 		maybe_reread_subscription();
 	}
 
+	elog(DEBUG1, "COMMIT: remote origin: %u ; session origin: %u", remote_origin_id, replorigin_session_origin);
+
 	in_remote_transaction = false;
 
 	/* Process any tables that are being synchronized in parallel. */
@@ -536,6 +540,8 @@ apply_handle_origin(StringInfo s)
 
 	origin = logicalrep_read_origin(s, &remote_origin_lsn);
 	remote_origin_id = replorigin_by_name(origin, true);	/* XXX useful? */
+
+	elog(DEBUG1, "ORIGIN: remote origin: \"%s\" %u ; session origin: %u", origin, remote_origin_id, replorigin_session_origin);
 }
 
 /*
@@ -600,6 +606,8 @@ apply_handle_insert(StringInfo s)
 	EState	   *estate;
 	TupleTableSlot *remoteslot;
 	MemoryContext oldctx;
+
+	elog(DEBUG1, "INSERT: remote origin: %u ; session origin: %u", remote_origin_id, replorigin_session_origin);
 
 	ensure_transaction();
 
@@ -702,6 +710,8 @@ apply_handle_update(StringInfo s)
 	TupleTableSlot *remoteslot;
 	bool		found;
 	MemoryContext oldctx;
+
+		elog(DEBUG1, "UPDATE: remote origin: %u ; session origin: %u", remote_origin_id, replorigin_session_origin);
 
 	ensure_transaction();
 
@@ -821,6 +831,8 @@ apply_handle_delete(StringInfo s)
 	TupleTableSlot *localslot;
 	bool		found;
 	MemoryContext oldctx;
+
+	elog(DEBUG1, "DELETE: remote origin: %u ; session origin: %u", remote_origin_id, replorigin_session_origin);
 
 	ensure_transaction();
 
