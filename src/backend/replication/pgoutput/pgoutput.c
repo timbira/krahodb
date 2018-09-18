@@ -432,7 +432,6 @@ pgoutput_change(LogicalDecodingContext *ctx, ReorderBufferTXN *txn,
 		oldcxt = MemoryContextSwitchTo(estate->es_query_cxt);
 		ecxt->ecxt_scantuple = ExecInitExtraTupleSlot(estate);
 		ExecSetSlotDescriptor(ecxt->ecxt_scantuple, tupdesc);
-		MemoryContextSwitchTo(oldcxt);
 
 		ExecStoreTuple(new_tuple ? new_tuple : old_tuple, ecxt->ecxt_scantuple, InvalidBuffer, false);
 
@@ -463,6 +462,9 @@ pgoutput_change(LogicalDecodingContext *ctx, ReorderBufferTXN *txn,
 				s = TextDatumGetCString(DirectFunctionCall2(pg_get_expr, CStringGetTextDatum(nodeToString(row_filter)), ObjectIdGetDatum(relentry->relid)));
 				elog(DEBUG2, "row filter \"%s\" was not matched", s);
 				pfree(s);
+				MemoryContextSwitchTo(oldcxt);
+				ExecDropSingleTupleTableSlot(ecxt->ecxt_scantuple);
+				FreeExecutorState(estate);
 				return;
 			}
 
@@ -470,6 +472,8 @@ pgoutput_change(LogicalDecodingContext *ctx, ReorderBufferTXN *txn,
 			elog(DEBUG2, "row filter \"%s\" was matched", s);
 			pfree(s);
 		}
+
+		MemoryContextSwitchTo(oldcxt);
 
 		ExecDropSingleTupleTableSlot(ecxt->ecxt_scantuple);
 		FreeExecutorState(estate);
