@@ -391,6 +391,7 @@ pgoutput_change(LogicalDecodingContext *ctx, ReorderBufferTXN *txn,
 		tupdesc = RelationGetDescr(relation);
 		estate = create_estate_for_relation(relation);
 
+#ifdef	_NOT_USED
 		if (old_tuple)
 		{
 			int i;
@@ -424,6 +425,7 @@ pgoutput_change(LogicalDecodingContext *ctx, ReorderBufferTXN *txn,
 				}
 			}
 		}
+#endif
 
 		/* prepare context per tuple */
 		ecxt = GetPerTupleExprContext(estate);
