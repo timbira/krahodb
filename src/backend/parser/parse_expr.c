@@ -1932,7 +1932,7 @@ transformSubLink(ParseState *pstate, SubLink *sublink)
 			err = _("cannot use subquery in column generation expression");
 			break;
 		case EXPR_KIND_PUBLICATION_WHERE:
-			err = _("cannot use subquery in publication WHERE condition");
+			err = _("cannot use subquery in publication WHERE expression");
 			break;
 
 			/*
@@ -3567,7 +3567,7 @@ ParseExprKindName(ParseExprKind exprKind)
 		case EXPR_KIND_GENERATED_COLUMN:
 			return "GENERATED AS";
 		case EXPR_KIND_PUBLICATION_WHERE:
-			return "publication WHERE";
+			return "publication expression";
 
 			/*
 			 * There is intentionally no default: case here, so that the

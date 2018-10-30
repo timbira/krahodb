@@ -2535,7 +2535,7 @@ check_srf_call_placement(ParseState *pstate, Node *last_srf, int location)
 			err = _("set-returning functions are not allowed in column generation expressions");
 			break;
 		case EXPR_KIND_PUBLICATION_WHERE:
-			err = _("set-returning functions are not allowed in publication WHERE conditions");
+			err = _("set-returning functions are not allowed in publication WHERE expressions");
 			break;
 
 			/*
