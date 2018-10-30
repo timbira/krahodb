@@ -22,7 +22,7 @@ PostgreSQL documentation
  <refsynopsisdiv>
 <synopsis>
 CREATE PUBLICATION <replaceable class="parameter">name</replaceable>
-    [ FOR TABLE [ ONLY ] <replaceable class="parameter">table_name</replaceable> [ * ] [ WHERE <replaceable class="parameter">condition</replaceable> ] [, ...]
+    [ FOR TABLE [ ONLY ] <replaceable class="parameter">table_name</replaceable> [ * ] [ WHERE ( <replaceable class="parameter">expression</replaceable> ) ] [, ...]
       | FOR ALL TABLES ]
     [ WITH ( <replaceable class="parameter">publication_parameter</replaceable> [= <replaceable class="parameter">value</replaceable>] [, ... ] ) ]
 
@@ -70,8 +70,8 @@ CREATE PUBLICATION <replaceable class="parameter">name</replaceable>
       Optionally, <literal>*</> can be specified after the table name to
       explicitly indicate that descendant tables are included. If the optional
       <literal>WHERE</literal> clause is specified, rows that do not satisfy
-      the <replaceable class="parameter">condition</replaceable> will not be
-      published.
+      the <replaceable class="parameter">expression</replaceable> will not be
+      published. Note that parentheses are required around the expression.
      </para>
 
      <para>
