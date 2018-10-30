@@ -1841,7 +1841,7 @@ transformSubLink(ParseState *pstate, SubLink *sublink)
 			err = _("cannot use subquery in partition key expression");
 			break;
 		case EXPR_KIND_PUBLICATION_WHERE:
-			err = _("cannot use subquery in publication WHERE condition");
+			err = _("cannot use subquery in publication WHERE expression");
 			break;
 
 			/*
@@ -3466,7 +3466,7 @@ ParseExprKindName(ParseExprKind exprKind)
 		case EXPR_KIND_PARTITION_EXPRESSION:
 			return "PARTITION BY";
 		case EXPR_KIND_PUBLICATION_WHERE:
-			return "publication WHERE";
+			return "publication expression";
 
 			/*
 			 * There is intentionally no default: case here, so that the
