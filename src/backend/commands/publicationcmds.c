@@ -648,8 +648,8 @@ PublicationAddTables(Oid pubid, List *rels, bool if_not_exists,
 
 		/* Must be owner of the table or superuser. */
 		if (!pg_class_ownercheck(RelationGetRelid(rel->relation), GetUserId()))
-			aclcheck_error(ACLCHECK_NOT_OWNER, get_relkind_objtype(rel->rd_rel->relkind),
-						   RelationGetRelationName(rel));
+			aclcheck_error(ACLCHECK_NOT_OWNER, get_relkind_objtype(rel->relation->rd_rel->relkind),
+						   RelationGetRelationName(rel->relation));
 
 		obj = publication_add_relation(pubid, rel, if_not_exists);
 		if (stmt)
