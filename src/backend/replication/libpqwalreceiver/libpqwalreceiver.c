@@ -915,7 +915,7 @@ libpqrcv_processTuples(PGresult *pgres, WalRcvExecResult *walres,
 	/* Process returned rows. */
 	for (tupn = 0; tupn < walres->ntuples; tupn++)
 	{
-		char	   *cstrs[nfields];
+		char	   *cstrs[MaxTupleAttributeNumber];
 
 		ProcessWalRcvInterrupts();
 
