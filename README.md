@@ -2,7 +2,7 @@
 
 KrahoDB is an open-source database designed to support multi-master replication. It is designed on the top of PostgreSQL, providing bidirectional replication, as well as row filtering.
 
-KrahoDB is a PostgreSQL fork. We provide versions based on PostgreSQL 10 and 11. All code is licensed under PostgreSQL license.
+KrahoDB is a PostgreSQL fork. We provide versions based on PostgreSQL 10, 11 and 12. All code is licensed under PostgreSQL license.
 
 ![Logo](krahodb.png)
 
