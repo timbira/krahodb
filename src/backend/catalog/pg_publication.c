@@ -197,6 +197,7 @@ publication_add_relation(Oid pubid, PublicationRelationQual *targetrel,
 	pstate->p_sourcetext = nodeToString(targetrel->whereClause);
 
 	rte = addRangeTableEntryForRelation(pstate, targetrel->relation,
+										AccessShareLock,
 										NULL, false, false);
 	addRTEtoQuery(pstate, rte, false, true, true);
 

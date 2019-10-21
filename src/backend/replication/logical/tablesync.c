@@ -772,7 +772,7 @@ fetch_remote_table_info(char *nspname, char *relname,
 	lrel->rowfiltercond = palloc0(res->ntuples * sizeof(char *));
 
 	n = 0;
-	slot = MakeSingleTupleTableSlot(res->tupledesc);
+	slot = MakeSingleTupleTableSlot(res->tupledesc, &TTSOpsMinimalTuple);
 	while (tuplestore_gettupleslot(res->tuplestore, true, false, slot))
 	{
 		Datum rf = slot_getattr(slot, 1, &isnull);
