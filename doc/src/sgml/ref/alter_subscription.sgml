@@ -162,7 +162,7 @@ ALTER SUBSCRIPTION <replaceable class="parameter">name</replaceable> RENAME TO <
     <listitem>
      <para>
       This clause alters parameters originally set by
-      <xref linkend="sql-createsubscription">.  See there for more
+      <xref linkend="sql-createsubscription"/>.  See there for more
       information.  The allowed options are <literal>slot_name</literal>,
       <literal>synchronous_commit</literal> and <literal>filter_origins</literal>
      </para>
