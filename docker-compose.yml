@@ -1,0 +1,41 @@
+version: '3'
+
+services:
+  kraho1:
+    image: 624a4ec0db3d
+    ports: 
+      - "5432:5432"
+    volumes:
+      - ./conf/:/var/lib/postgresql/conf
+      - ./scrips/://docker-entrypoint-initdb.d
+    networks:
+      default:
+        aliases:
+          - ${HOSTNAME}
+          
+  kraho2:
+    image: 624a4ec0db3d
+    ports: 
+      - "5433:5432"
+    volumes:
+      - ./conf/:/var/lib/postgresql/conf
+      - ./scrips/://docker-entrypoint-initdb.d
+    networks:
+      default:
+        aliases:
+          - ${HOSTNAME}
+          
+  kraho3:
+    image: 624a4ec0db3d
+    ports: 
+      - "5434:5432"
+    volumes:
+      - ./conf/:/var/lib/postgresql/conf
+      - ./scrips/://docker-entrypoint-initdb.d
+    networks:
+      default:
+        aliases:
+          - ${HOSTNAME}
+    
+networks:
+  default:
