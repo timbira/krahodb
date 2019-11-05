@@ -1,0 +1,46 @@
+version: '3'
+
+services:
+  kraho1:
+    hostname: kraho1
+    image: kraho 
+    ports: 
+      - "5432:5432"
+    volumes:
+      - ./conf/:/conf
+      - ./scripts:/scripts
+    networks:
+      default:
+        aliases:
+          - ${HOSTNAME}
+          
+  kraho2:
+    hostname: kraho2
+    image: kraho
+    ports: 
+      - "5433:5432"
+    volumes:
+      - ./conf/:/conf
+    networks:
+      default:
+        aliases:
+          - ${HOSTNAME}
+          
+  kraho3:
+    hostname: kraho3
+    image: kraho
+    ports: 
+      - "5434:5432"
+    volumes:
+      - ./conf/:/conf
+    networks:
+      default:
+        aliases:
+          - ${HOSTNAME}
+    
+networks:
+  default:
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/24
