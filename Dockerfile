@@ -57,6 +57,9 @@ RUN set -eux; \
 	rm -rf /var/lib/apt/lists/*
 
 RUN mkdir /docker-entrypoint-initdb.d
+COPY scripts/createuser.sh /docker-entrypoint-initdb.d/
+COPY scripts/afterinitdb.sh /docker-entrypoint-initdb.d/
+COPY conf/.pgpass /root/
 
 RUN set -ex; \
 # pub   4096R/ACCC4CF8 2011-10-13 [expires: 2019-07-02]
