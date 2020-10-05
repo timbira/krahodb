@@ -28,9 +28,12 @@
  */
 CATALOG(pg_publication_rel,6106,PublicationRelRelationId)
 {
-	Oid			oid;			/* oid */
-	Oid			prpubid;		/* Oid of the publication */
-	Oid			prrelid;		/* Oid of the relation */
+	Oid				oid;			/* oid */
+	Oid				prpubid;		/* Oid of the publication */
+	Oid				prrelid;		/* Oid of the relation */
+#ifdef	CATALOG_VARLEN
+	pg_node_tree	prrofilter
+#endif
 } FormData_pg_publication_rel;
 
 /* ----------------
