@@ -34,6 +34,7 @@
 #include "utils/syscache.h"
 
 static List *textarray_to_stringlist(ArrayType *textarray);
+static List *oidarray_to_oidlist(ArrayType *oidarray);
 
 /*
  * Fetch the subscription from the syscache.
@@ -65,6 +66,7 @@ GetSubscription(Oid subid, bool missing_ok)
 	sub->name = pstrdup(NameStr(subform->subname));
 	sub->owner = subform->subowner;
 	sub->enabled = subform->subenabled;
+	sub->roident = subform->subroident;
 
 	/* Get conninfo */
 	datum = SysCacheGetAttr(SUBSCRIPTIONOID,
@@ -99,6 +101,16 @@ GetSubscription(Oid subid, bool missing_ok)
 							&isnull);
 	Assert(!isnull);
 	sub->publications = textarray_to_stringlist(DatumGetArrayTypeP(datum));
+
+	/* Get origins to filter out */
+	datum = SysCacheGetAttr(SUBSCRIPTIONOID,
+							tup,
+							Anum_pg_subscription_subfilterorigins,
+							&isnull);
+	if (!isnull)
+		sub->filterorigins = oidarray_to_oidlist(DatumGetArrayTypeP(datum));
+	else
+		sub->filterorigins = NULL;
 
 	ReleaseSysCache(tup);
 
@@ -224,6 +236,30 @@ textarray_to_stringlist(ArrayType *textarray)
 
 	for (i = 0; i < nelems; i++)
 		res = lappend(res, makeString(TextDatumGetCString(elems[i])));
+
+	return res;
+}
+
+/*
+ * Convert oid array to list of oids.
+ */
+static List *
+oidarray_to_oidlist(ArrayType *oidarray)
+{
+	Datum	   *elems;
+	int			nelems,
+				i;
+	List	   *res = NIL;
+
+	deconstruct_array(oidarray,
+					  OIDOID, sizeof(Oid), true, 'i',
+					  &elems, NULL, &nelems);
+
+	if (nelems == 0)
+		return NIL;
+
+	for (i = 0; i < nelems; i++)
+		res = lappend_oid(res, DatumGetObjectId(elems[i]));
 
 	return res;
 }

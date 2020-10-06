@@ -36,4 +36,6 @@ extern bool SplitGUCList(char *rawstring, char separator,
 extern text *replace_text_regexp(text *src_text, void *regexp,
 								 text *replace_text, bool glob);
 
+extern bool string_to_oid_list(char *str, char separator, List **result);
+
 #endif
