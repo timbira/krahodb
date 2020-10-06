@@ -159,7 +159,7 @@ publication_add_relation(Oid pubid, PublicationRelationQual *targetrel,
 	ObjectAddress myself,
 					referenced;
 	ParseState		*pstate;
-	RangeTblEntry	*rte;
+	ParseNamespaceItem *nsitem;
 	Node			*whereclause;
 
 	rel = table_open(PublicationRelRelationId, RowExclusiveLock);
@@ -189,11 +189,10 @@ publication_add_relation(Oid pubid, PublicationRelationQual *targetrel,
 	pstate = make_parsestate(NULL);
 	pstate->p_sourcetext = nodeToString(targetrel->whereClause);
 
-	/* FIXME: this should check for error */
-	rte = addRangeTableEntryForRelation(pstate, targetrel->relation,
+	nsitem = addRangeTableEntryForRelation(pstate, targetrel->relation,
 											AccessShareLock,
-											NULL, false, false)->p_rte;
-	addRTEtoQuery(pstate, rte, false, true, true);
+											NULL, false, false);
+	addNSItemToQuery(pstate, nsitem, false, true, true);
 
 	whereclause = transformWhereClause(pstate,
 									copyObject(targetrel->whereClause),
